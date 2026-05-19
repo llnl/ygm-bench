@@ -6,7 +6,7 @@
 cmake_minimum_required(VERSION 3.14)
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake") 
 project(ygm-bench         
-	VERSION 0.8
+	VERSION 0.9
 	DESCRIPTION "YGM Benchmarks"         
 	LANGUAGES CXX) 
 
@@ -17,28 +17,6 @@ include(FetchContent)
 #
 #  MPI
 find_package(MPI)
-
-#
-# Boost
-#
-if (NOT boost_POPULATED)
-    find_package(Boost 1.81)
-    if (Boost_FOUND)
-        message(STATUS ${PROJECT_NAME} " found boost include dirs: "
-                       ${Boost_INCLUDE_DIRS}
-        )
-    else ()
-        message(STATUS "Fetching Boost from source")
-        FetchContent_Declare(
-            Boost
-            URL ${BOOST_FETCH_URL}
-            DOWNLOAD_EXTRACT_TIMESTAMP ON
-        )
-        set(BOOST_INCLUDE_LIBRARIES json unordered container static_string)
-        FetchContent_MakeAvailable(Boost)
-    endif ()
-endif ()
-
 
 #
 #  ygm
@@ -52,7 +30,7 @@ if(NOT ygm_FOUND)
 	if(DEFINED ENV{YGM_BENCH_YGM_TAG})
 		set(YGM_TAG $ENV{YGM_BENCH_YGM_TAG})
 	else()
-		set(YGM_TAG "v0.8")
+		set(YGM_TAG "v0.9")
 	endif()
 
 	FetchContent_Declare(

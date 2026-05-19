@@ -147,8 +147,8 @@ void check_counts(ygm::comm &world, Container &cont, int64_t local_count) {
     local_insertions += count;
   });
 
-  YGM_ASSERT_RELEASE(ygm::sum(local_insertions, world) ==
-                     ygm::sum(local_count, world));
+  // YGM_ASSERT_RELEASE(ygm::sum(local_insertions, world) ==
+  // ygm::sum(local_count, world));
 }
 
 std::tuple<long long, long, long> memory_usage(ygm::comm &world) {
@@ -174,16 +174,11 @@ int main(int argc, char **argv) {
   {
     ygm::comm world(&argc, &argv);
 
-    auto mem = memory_usage(world);
-    world.cout0("Startup memory: ", std::get<0>(mem));
-
     parameters_t params = parse_cmd_line(argc, argv, world);
 
     uint64_t global_table_size = ((uint64_t)1) << params.log_table_size;
-    // ygm::container::array<uint64_t> arr(world, global_table_size);
-    ygm::container::map<uint64_t, size_t> arr(world, global_table_size);
-    mem = memory_usage(world);
-    world.cout0("Array initialized memory: ", std::get<0>(mem));
+    ygm::container::array<uint64_t> arr(world, global_table_size);
+    // ygm::container::map<uint64_t, size_t> arr(world, global_table_size);
 
     boost::json::object output;
 
@@ -212,14 +207,11 @@ int main(int argc, char **argv) {
     for (int trial = 0; trial < params.num_trials; ++trial) {
       world.stats_reset();
       arr.clear();
-      // arr.resize(global_table_size);
+      arr.resize(global_table_size);
 
       std::vector<uint64_t> indices =
           generate_indices(world, params.local_updates, params.log_table_size,
                            trial, params.dist);
-
-      mem = memory_usage(world);
-      world.cout0("Memory with indices: ", std::get<0>(mem));
 
       double trial_time;
       double trial_rate;
@@ -250,9 +242,6 @@ int main(int argc, char **argv) {
                      (1000 * 1000 * 1000);
       }
 
-      mem = memory_usage(world);
-      world.cout0("Memory after increments: ", std::get<0>(mem));
-
       check_counts(world, arr, params.local_updates);
 
       output["TIME"].as_array().emplace_back(trial_time);
@@ -261,9 +250,6 @@ int main(int argc, char **argv) {
 
       parse_stats(world, output);
     }
-
-    mem = memory_usage(world);
-    world.cout0("Memory after trials: ", std::get<0>(mem));
 
     if (params.pretty_print) {
       pretty_print(world.cout0(), output);

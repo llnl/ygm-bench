@@ -19,7 +19,7 @@ struct parameters_t {
 
   parameters_t()
       : log_table_size(15),
-        local_updaters(1024 * 1024),
+        local_updaters(1024 * 16),
         updater_lifetime(100),
         num_trials(5),
         pretty_print(false) {}
@@ -80,6 +80,7 @@ parameters_t parse_cmd_line(int argc, char **argv, ygm::comm &comm) {
 }
 
 static parameters_t params;
+static size_t       global_table_size;
 
 class updater {
  public:
@@ -118,7 +119,7 @@ struct recursive_functor {
     u.increment_counter();
 
     if (u.is_alive()) {
-      size_t new_index = value & (parray->size() - 1);
+      size_t new_index = value & (global_table_size - 1);
       parray->async_visit(new_index, recursive_functor(), u);
     }
   }
@@ -130,7 +131,7 @@ int main(int argc, char **argv) {
 
     params = parse_cmd_line(argc, argv, world);
 
-    size_t global_table_size = ((size_t)1) << params.log_table_size;
+    global_table_size = ((size_t)1) << params.log_table_size;
     ygm::container::array<size_t> arr(world, global_table_size);
 
     boost::json::object output;

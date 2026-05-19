@@ -63,6 +63,10 @@ void parse_stats(ygm::comm &c, boost::json::object &o) {
       if (label != "NAME" && label != "TIME") {
         ygm::io::detail::csv_field field(value);
 
+        if (not o.contains(label)) {
+          o[label] = boost::json::array();
+        }
+
         if (field.is_integer()) {
           o[label].as_array().emplace_back(field.as_integer());
         } else if (field.is_double()) {
