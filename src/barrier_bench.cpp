@@ -13,12 +13,14 @@ struct parameters_t {
   int  num_barriers;
   int  asyncs_per_barrier;
   int  num_trials;
+  bool mpi_barrier;
   bool pretty_print;
 
   parameters_t()
       : num_barriers(100000),
         asyncs_per_barrier(0),
         num_trials(5),
+        mpi_barrier(false),
         pretty_print(false) {}
 };
 
@@ -27,6 +29,7 @@ void usage(ygm::comm &comm) {
                << "\n\t-b <int>\t- Number of barriers per trial"
                << "\n\t-a <int>\t- Number of asyncs per barrier"
                << "\n\t-t <int>\t- Number of trials"
+               << "\n\t-m\t\t- Test MPI barrier instead of YGM barrier"
                << "\n\t-p\t\t- Pretty print output"
                << "\n\t-h\t\t- Print help" << std::endl;
 }
@@ -40,7 +43,7 @@ parameters_t parse_cmd_line(int argc, char **argv, ygm::comm &comm) {
   extern int opterr;
   opterr = 0;
 
-  while ((c = getopt(argc, argv, "b:a:t:ph")) != -1) {
+  while ((c = getopt(argc, argv, "b:a:t:mph")) != -1) {
     switch (c) {
       case 'h':
         prn_help = true;
@@ -54,6 +57,9 @@ parameters_t parse_cmd_line(int argc, char **argv, ygm::comm &comm) {
       case 't':
         params.num_trials = atoi(optarg);
         break;
+      case 'm':
+        params.mpi_barrier = true;
+        break;
       case 'p':
         params.pretty_print = true;
         break;
@@ -62,6 +68,12 @@ parameters_t parse_cmd_line(int argc, char **argv, ygm::comm &comm) {
         prn_help = true;
         break;
     }
+  }
+
+  if (params.mpi_barrier && (params.asyncs_per_barrier > 0)) {
+    comm.cerr0() << "Unable to perform asyncs while testing MPI barrier."
+                 << std::endl;
+    exit(-1);
   }
 
   if (prn_help) {
@@ -91,8 +103,14 @@ std::vector<int> generate_async_dests(ygm::comm &comm, const int num_asyncs) {
   return dests;
 }
 
-void run_barriers(ygm::comm &comm, const int num_barriers,
-                  const std::vector<int> dests) {
+void run_mpi_barriers(ygm::comm &comm, const int num_barriers) {
+  for (int b = 0; b < num_barriers; ++b) {
+    comm.cf_barrier();
+  }
+}
+
+void run_ygm_barriers(ygm::comm &comm, const int num_barriers,
+                      const std::vector<int> dests) {
   for (int b = 0; b < num_barriers; ++b) {
     for (const int dest : dests) {
       comm.async(dest, [] {});
@@ -113,6 +131,11 @@ int main(int argc, char **argv) {
   output["BARRIERS_PER_SECOND"] = boost::json::array();
   output["NUM_BARRIERS"]        = params.num_barriers;
   output["ASYNCS_PER_BARRIER"]  = params.asyncs_per_barrier;
+  if (params.mpi_barrier) {
+    output["BARRIER_TYPE"] = "MPI";
+  } else {
+    output["BARRIER_TYPE"] = "YGM";
+  }
 
   parse_welcome(world, output);
 
@@ -124,10 +147,14 @@ int main(int argc, char **argv) {
 
     double trial_time;
     double trial_rate;
-    world.barrier();
+    world.cf_barrier();
     ygm::utility::timer barriers_timer{};
 
-    run_barriers(world, params.num_barriers, async_dests);
+    if (params.mpi_barrier) {
+      run_mpi_barriers(world, params.num_barriers);
+    } else {
+      run_ygm_barriers(world, params.num_barriers, async_dests);
+    }
 
     trial_time = barriers_timer.elapsed();
     trial_rate = params.num_barriers / trial_time;
